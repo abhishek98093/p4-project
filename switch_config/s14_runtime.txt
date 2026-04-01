@@ -1,0 +1,89 @@
+table_add tbl_switch_id set_switch_id => 14
+mirroring_add 100 255
+mc_mgrp_create 1
+mc_node_create 0 1
+mc_node_create 1 2
+mc_node_create 2 3
+mc_node_associate 1 0
+mc_node_associate 1 1
+mc_node_associate 1 2
+table_add tbl_l2 l2_forward 00:00:00:00:01:01 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:01:02 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:01:03 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:01:04 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:01:05 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:01:06 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:01:07 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:01:08 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:02:01 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:02:02 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:02:03 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:02:04 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:02:05 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:02:06 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:02:07 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:02:08 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:03:01 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:03:02 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:03:03 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:03:04 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:03:05 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:03:06 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:03:07 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:03:08 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:04:01 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:04:02 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:04:03 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:04:04 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:04:05 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:04:06 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:04:07 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:04:08 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:05:01 => 0
+table_add tbl_l2 l2_forward 00:00:00:00:05:02 => 0
+table_add tbl_l2 l2_forward 00:00:00:00:05:03 => 0
+table_add tbl_l2 l2_forward 00:00:00:00:05:04 => 0
+table_add tbl_l2 l2_forward 00:00:00:00:05:05 => 0
+table_add tbl_l2 l2_forward 00:00:00:00:05:06 => 0
+table_add tbl_l2 l2_forward 00:00:00:00:05:07 => 0
+table_add tbl_l2 l2_forward 00:00:00:00:05:08 => 0
+table_add tbl_l2 l2_forward 00:00:00:00:06:01 => 1
+table_add tbl_l2 l2_forward 00:00:00:00:06:02 => 1
+table_add tbl_l2 l2_forward 00:00:00:00:06:03 => 1
+table_add tbl_l2 l2_forward 00:00:00:00:06:04 => 1
+table_add tbl_l2 l2_forward 00:00:00:00:06:05 => 1
+table_add tbl_l2 l2_forward 00:00:00:00:06:06 => 1
+table_add tbl_l2 l2_forward 00:00:00:00:06:07 => 1
+table_add tbl_l2 l2_forward 00:00:00:00:06:08 => 1
+table_add tbl_l2 l2_forward 00:00:00:00:07:01 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:07:02 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:07:03 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:07:04 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:07:05 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:07:06 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:07:07 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:07:08 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:08:01 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:08:02 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:08:03 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:08:04 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:08:05 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:08:06 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:08:07 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:08:08 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:09:01 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:09:02 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:09:03 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:09:04 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:09:05 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:09:06 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:09:07 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:09:08 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:0a:01 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:0a:02 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:0a:03 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:0a:04 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:0a:05 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:0a:06 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:0a:07 => 2
+table_add tbl_l2 l2_forward 00:00:00:00:0a:08 => 2
