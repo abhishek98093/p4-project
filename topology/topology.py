@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
-"""
-topology.py — ARP Flood Detection — Fixed Version
-==================================================
+r"""
+topology_simple_fixed.py — Reduced ARP Flood Detection Topology
+================================================================
 Architecture:
-    s11 (core)
-    / | \ \ \
-  s12 s13 s14 s15 s16 (aggregation)
-   /\   /\   /\   /\   /\
- s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 (edge)
- 8h  8h  8h  8h  8h  8h  8h  8h  8h  8h
+      s11 (core)
+      /    \
+    s1      s2 (edge)
+   / \     / \
+  h1-h8   h9-h16
 
-MAC scheme (FIXED):
+MAC scheme (identical to original):
     Host on edge switch sN, port j → MAC = 00:00:00:00:0N:0j
     Example: h1 on s1 port1 → 00:00:00:00:01:01
-    This matches BMv2's expectation for unique MACs
 """
 
 import os, sys, time, subprocess
@@ -32,97 +30,42 @@ os.makedirs(LOGDIR, exist_ok=True)
 os.makedirs(CFGDIR, exist_ok=True)
 
 HOSTS_PER_EDGE = 8
-
-# Tree structure: edge → aggregation
-EDGE_TO_AGG = {
-    1: 12, 2: 12,   # s1,s2 → s12
-    3: 13, 4: 13,   # s3,s4 → s13
-    5: 14, 6: 14,   # s5,s6 → s14
-    7: 15, 8: 15,   # s7,s8 → s15
-    9: 16, 10: 16,  # s9,s10 → s16
-}
-AGG_TO_ROOT = {12: 11, 13: 11, 14: 11, 15: 11, 16: 11}
 ROOT = 11
-
+EDGE_SWITCHES = [1, 2]
+ALL_SWITCH_NUMS = [1, 2, 11]
 
 def compute_mac_tables():
     """
-    Compute MAC→port for every switch with CORRECT MAC format.
-    MAC = 00:00:00:00:0N:0j where:
-        N = switch number (1-10 for edge, 11 for root, 12-16 for agg)
-        j = port number (1-8 for hosts)
+    Returns mac_tables[sw_num] = {mac: bmv2_port}
+    - s1, s2: host ports 0..7, uplink to core on port 8
+    - s11:    s1 on port 0, s2 on port 1
     """
-    # Build host MAC list per edge switch
-    # sw_hosts[sw_num] = [(mac, local_port), ...]
-    sw_hosts = {}
-    for sw_num in range(1, 11):  # edge switches 1-10
-        sw_hosts[sw_num] = []
+    # Build host list per edge switch
+    sw_hosts = {1: [], 2: []}
+    for sw_num in EDGE_SWITCHES:
         for j in range(1, HOSTS_PER_EDGE + 1):
-            # FIXED: Use consistent MAC format
             mac = f"00:00:00:00:{sw_num:02x}:{j:02x}"
-            sw_hosts[sw_num].append((mac, j))  # port = j (1-indexed)
-            info(f"    Host s{sw_num}p{j} MAC {mac}\n")
+            sw_hosts[sw_num].append((mac, j-1))   # port 0-indexed
 
-    # Aggregation switches have no hosts
-    for sw_num in [11, 12, 13, 14, 15, 16]:
-        sw_hosts[sw_num] = []
+    tables = {1: {}, 2: {}, 11: {}}
 
-    tables = {}
-
-    # ── Edge switches (s1-s10) ─────────────────────────────────────────
-    for sw_num in range(1, 11):
-        tables[sw_num] = {}
-        # FIXED: Use 0-indexed ports for BMv2
-        uplink_port = HOSTS_PER_EDGE  # port 8 (0-indexed) - was 9
-
-        # Local hosts → direct port (convert to 0-indexed)
+    # ----- Edge switches s1 and s2 -----
+    for sw_num in EDGE_SWITCHES:
+        uplink_port = HOSTS_PER_EDGE   # port 8 (0-indexed)
+        # Local hosts
         for mac, port in sw_hosts[sw_num]:
-            tables[sw_num][mac] = port - 1  # Convert 1-indexed to 0-indexed
+            tables[sw_num][mac] = port
+        # Remote hosts (the other edge) via uplink
+        other_sw = 2 if sw_num == 1 else 1
+        for mac, _ in sw_hosts[other_sw]:
+            tables[sw_num][mac] = uplink_port
 
-        # All remote hosts → uplink port (0-indexed)
-        for other_sw in range(1, 11):
-            if other_sw == sw_num:
-                continue
-            for mac, _ in sw_hosts[other_sw]:
-                tables[sw_num][mac] = uplink_port
-
-        # Add MACs for aggregation and core switches? No - they're not hosts
-        # Traffic to switches themselves goes through uplink too
-
-    # ── Aggregation switches (s12-s16) ─────────────────────────────────
-    agg_edges = {}  # agg_sw → [edge1, edge2]
-    for edge, agg in sorted(EDGE_TO_AGG.items()):
-        agg_edges.setdefault(agg, []).append(edge)
-
-    for agg_sw, edges in agg_edges.items():
-        tables[agg_sw] = {}
-        # FIXED: Use 0-indexed ports
-        root_port = len(edges)  # port 2 (0-indexed) - was 3
-
-        # MACs from edge1 → port 0, edge2 → port 1 (0-indexed)
-        for port_idx, edge_sw in enumerate(edges, start=0):  # start at 0
-            for mac, _ in sw_hosts[edge_sw]:
-                tables[agg_sw][mac] = port_idx
-
-        # All other MACs (from other edges) → root uplink (port 2)
-        all_edges = set(range(1, 11))
-        local_edges = set(edges)
-        remote_edges = all_edges - local_edges
-        
-        for edge_sw in remote_edges:
-            for mac, _ in sw_hosts[edge_sw]:
-                tables[agg_sw][mac] = root_port
-
-    # ── Core switch (s11) ──────────────────────────────────────────────
-    agg_order = [12, 13, 14, 15, 16]
-    tables[ROOT] = {}
-    # FIXED: Use 0-indexed ports
-    for port_idx, agg_sw in enumerate(agg_order, start=0):  # start at 0
-        # All hosts under this aggregation switch
-        edges = agg_edges[agg_sw]
-        for edge_sw in edges:
-            for mac, _ in sw_hosts[edge_sw]:
-                tables[ROOT][mac] = port_idx
+    # ----- Core switch s11 -----
+    # Port 0 -> s1, Port 1 -> s2
+    for mac, _ in sw_hosts[1]:
+        tables[11][mac] = 0
+    for mac, _ in sw_hosts[2]:
+        tables[11][mac] = 1
 
     return tables, sw_hosts
 
@@ -133,7 +76,7 @@ class P4Switch(Switch):
         super().__init__(name, **kwargs)
         self.sw_id       = sw_id
         self.json_path   = json_path
-        self.thrift_port = 9090 + (sw_id - 1) * 10  # Avoid port conflicts
+        self.thrift_port = 9090 + (sw_id - 1) * 10
         self.log_file    = os.path.join(LOGDIR, f"{name}.log")
         self.proc        = None
         self.cpu_intf    = f"{name}-cpu0"
@@ -144,18 +87,15 @@ class P4Switch(Switch):
         os.system(f"ip link add {self.cpu_intf} type veth peer name {self.cpu_ctrl}")
         os.system(f"ip link set {self.cpu_intf} up")
         os.system(f"ip link set {self.cpu_ctrl} up")
-        info(f"  [{self.name}] CPU veth: {self.cpu_intf} ↔ {self.cpu_ctrl}\n")
 
     def start(self, controllers):
         self._create_cpu_veth()
         iface_args = []
-        # IMPORTANT: BMv2 ports are 0-indexed in interface list
         port_idx = 0
         for intf in self.intfList():
             if intf.name == "lo":
                 continue
             iface_args += ["-i", f"{port_idx}@{intf.name}"]
-            info(f"    {self.name}: port {port_idx} = {intf.name}\n")
             port_idx += 1
         # CPU port always 255
         iface_args += ["-i", f"255@{self.cpu_intf}"]
@@ -169,12 +109,8 @@ class P4Switch(Switch):
             "--log-level",   "warn",
         ] + iface_args + [self.json_path]
 
-        info(f"  [{self.name}] id={self.sw_id} thrift={self.thrift_port} "
-             f"ports={port_idx} cpu={self.cpu_intf}\n")
-
         with open(self.log_file, "w") as lf:
-            self.proc = subprocess.Popen(cmd, stdout=lf, stderr=lf,
-                                        close_fds=True)
+            self.proc = subprocess.Popen(cmd, stdout=lf, stderr=lf, close_fds=True)
 
     def stop(self, deleteIntfs=True):
         if self.proc and self.proc.poll() is None:
@@ -186,97 +122,48 @@ class P4Switch(Switch):
 
     def configure(self, mac_table, switch_type):
         """
-        Configure switch with runtime commands.
-        switch_type: 'edge', 'agg', or 'core'
+        Configure split‑horizon multicast groups.
+        Creates one group per data port, group_id = ingress_port + 1,
+        containing all data ports EXCEPT the ingress_port.
         """
-        # Get all BMv2 ports (excluding CPU port 255)
-        ports = []
+        # Collect all data ports (interfaces except 'lo')
+        data_ports = []
         for idx, intf in enumerate(self.intfList()):
             if intf.name != "lo":
-                ports.append(idx)
-        
-        # BMv2 uses 0-indexed ports everywhere
-        all_ports = ports  # Already 0-indexed
-        
+                data_ports.append(idx)
+        num_ports = len(data_ports)
+
         lines = []
         lines.append(f"table_add tbl_switch_id set_switch_id => {self.sw_id}")
         lines.append("mirroring_add 100 255")
-        lines.append("mc_mgrp_create 1")
 
-        # Flood group should include ALL PORTS EXCEPT CPU (0-indexed)
-        flood_ports = all_ports
+        handle = 0
+        # Create one multicast group per possible ingress port
+        for ingress in range(num_ports):
+            group_id = ingress + 1
+            lines.append(f"mc_mgrp_create {group_id}")
 
-        # Create multicast nodes for each port
-        for handle, port in enumerate(flood_ports):
-            lines.append(f"mc_node_create {handle} {port}")
-        
-        # Associate all nodes with multicast group 1
-        for handle in range(len(flood_ports)):
-            lines.append(f"mc_node_associate 1 {handle}")
+            # Egress ports = all data ports except the ingress port
+            egress_ports = [p for p in data_ports if p != ingress]
+            first_handle = handle
+            for egress in egress_ports:
+                lines.append(f"mc_node_create {handle} {egress}")
+                handle += 1
+            # Associate all nodes of this group
+            for h in range(first_handle, handle):
+                lines.append(f"mc_node_associate {group_id} {h}")
 
-        # Add MAC table entries (all 80 hosts) - ports are already 0-indexed
-        added = 0
+        # L2 forwarding entries
         for mac, port in sorted(mac_table.items()):
             lines.append(f"table_add tbl_l2 l2_forward {mac} => {port}")
-            added += 1
-            if added <= 3:  # Show first few for debugging
-                info(f"    {self.name}: {mac} → port {port}\n")
 
         cfg_path = os.path.join(CFGDIR, f"{self.name}_runtime.txt")
         with open(cfg_path, "w") as f:
             f.write("\n".join(lines) + "\n")
 
-        # Apply configuration
-        cmd = f"simple_switch_CLI --thrift-port {self.thrift_port} < {cfg_path}"
-        result = subprocess.run(cmd, shell=True, capture_output=True, 
-                               text=True, timeout=30)
-        
-        errs = [l for l in result.stdout.splitlines()
-                if "error" in l.lower() and "duplicate" not in l.lower()]
-        if errs:
-            error(f"  [{self.name}] CLI errors: {errs[:2]}\n")
-        else:
-            info(f"  [{self.name}] ✓ configured ({switch_type}) "
-                 f"flood_ports={flood_ports}, mac_entries={added}\n")
-
-
-def build_network():
-    net = Mininet(
-        controller=None, switch=P4Switch, host=Host,
-        link=TCLink, autoSetMacs=False,  # We set MACs manually
-        autoStaticArp=False, build=False,
-    )
-
-    info("\n[TOPO] Adding switches...\n")
-    switches = {}
-    # All 20 switches
-    for sw_num in list(range(1, 11)) + [11, 12, 13, 14, 15, 16]:
-        sw = net.addSwitch(f"s{sw_num}", cls=P4Switch,
-                          sw_id=sw_num, json_path=P4JSON)
-        switches[f"s{sw_num}"] = sw
-
-    info("[TOPO] Adding 80 hosts (8 per edge switch)...\n")
-    host_idx = 1
-    for sw_num in range(1, 11):
-        for j in range(1, HOSTS_PER_EDGE + 1):
-            # FIXED: Use correct MAC format
-            mac = f"00:00:00:00:{sw_num:02x}:{j:02x}"
-            ip  = f"10.{sw_num}.{j}.1/16"  # Changed IP scheme
-            h   = net.addHost(f"h{host_idx}", ip=ip, mac=mac)
-            net.addLink(h, switches[f"s{sw_num}"])
-            host_idx += 1
-
-    info("[TOPO] Adding edge→aggregation uplinks...\n")
-    for edge, agg in sorted(EDGE_TO_AGG.items()):
-        net.addLink(switches[f"s{edge}"], switches[f"s{agg}"])
-        info(f"  s{edge} (port {HOSTS_PER_EDGE}) → s{agg}\n")  # 0-indexed
-
-    info("[TOPO] Adding aggregation→root uplinks...\n")
-    for agg in sorted(AGG_TO_ROOT.keys()):
-        net.addLink(switches[f"s{agg}"], switches[f"s{ROOT}"])
-        info(f"  s{agg} → s{ROOT}\n")
-
-    return net, switches
+        subprocess.run(f"simple_switch_CLI --thrift-port {self.thrift_port} < {cfg_path}",
+                       shell=True, capture_output=True, text=True, timeout=30)
+        info(f"  [{self.name}] ✓ configured ({switch_type}) groups={num_ports} entries={len(mac_table)}\n")
 
 
 def main():
@@ -288,14 +175,35 @@ def main():
         sys.exit(1)
 
     info("\n" + "="*60)
-    info("\n[TOPO] Tree topology: s11(root) → s12-s16(agg) → s1-s10(edge) → 80 hosts\n")
+    info("\n[TOPO] Simplified tree: s11(core) → s1,s2(edge) → 16 hosts\n")
     info("="*60 + "\n")
 
-    info("[TOPO] Computing MAC tables with CORRECT format...\n")
-    mac_tables, sw_hosts = compute_mac_tables()
+    info("[TOPO] Computing MAC tables...\n")
+    mac_tables, _ = compute_mac_tables()
 
-    info("\n[TOPO] Building network...\n")
-    net, switches = build_network()
+    net = Mininet(controller=None, switch=P4Switch, host=Host,
+                  link=TCLink, autoSetMacs=False, autoStaticArp=False)
+
+    info("[TOPO] Adding switches...\n")
+    switches = {}
+    for sw_num in ALL_SWITCH_NUMS:
+        sw = net.addSwitch(f"s{sw_num}", cls=P4Switch,
+                           sw_id=sw_num, json_path=P4JSON)
+        switches[f"s{sw_num}"] = sw
+
+    info("[TOPO] Adding 16 hosts (8 per edge switch)...\n")
+    host_idx = 1
+    for sw_num in EDGE_SWITCHES:
+        for j in range(1, HOSTS_PER_EDGE + 1):
+            mac = f"00:00:00:00:{sw_num:02x}:{j:02x}"
+            ip  = f"10.{sw_num}.{j}.1/8"          # <-- changed from /16 to /8
+            h = net.addHost(f"h{host_idx}", ip=ip, mac=mac)
+            net.addLink(h, switches[f"s{sw_num}"])
+            host_idx += 1
+
+    info("[TOPO] Adding core links (s1‑s11, s2‑s11)...\n")
+    net.addLink(switches["s1"], switches["s11"])
+    net.addLink(switches["s2"], switches["s11"])
 
     info("\n[TOPO] Starting network...\n")
     net.start()
@@ -304,33 +212,26 @@ def main():
     time.sleep(5)
 
     info("\n[TOPO] Configuring switches...\n")
-    for name in sorted(switches, key=lambda x: int(x[1:])):
+    for name, sw in switches.items():
         sw_num = int(name[1:])
-        if sw_num <= 10:
-            switch_type = "edge"
-        elif sw_num == 11:
+        if sw_num == ROOT:
             switch_type = "core"
         else:
-            switch_type = "aggregation"
-        switches[name].configure(mac_tables[sw_num], switch_type)
+            switch_type = "edge"
+        sw.configure(mac_tables[sw_num], switch_type)
 
-    # Generate controller command
-    ifaces = " ".join(
-        switches[f"s{i}"].cpu_ctrl
-        for i in list(range(1, 11)) + [11, 12, 13, 14, 15, 16]
-    )
-    
+    # Generate controller command (optional)
+    ifaces = " ".join(switches[f"s{i}"].cpu_ctrl for i in ALL_SWITCH_NUMS)
+
     info("\n" + "="*60)
-    info("\n[TOPO] NETWORK READY\n")
+    info("\n[TOPO] NETWORK READY (3 switches, 16 hosts)\n")
     info("="*60)
-    info("\nTo start controller:\n")
+    info("\nTo start the controller:\n")
     info(f"  sudo python3 {BASE}/controller/controller.py \\\n")
     info(f"    --interfaces {ifaces} --label normal\n")
     info("\nConnectivity tests:\n")
-    info("  Same switch:    h1 ping -c 3 10.1.2.1\n")  # Fixed: h2 is 10.1.2.1
-    info("  Different edge: h1 ping -c 3 10.2.1.1\n")
-    info("  Cross-agg:      h1 ping -c 3 10.3.1.1\n")
-    info("  Cross-core:     h1 ping -c 3 10.5.1.1\n")
+    info("  Same switch:    h1 ping -c 3 10.1.2.1\n")
+    info("  Cross‑edge:     h1 ping -c 3 10.2.1.1\n")
     info("="*60 + "\n")
 
     CLI(net)

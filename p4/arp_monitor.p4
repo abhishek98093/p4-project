@@ -2,7 +2,8 @@
  * arp_monitor.p4  —  ARP Flood Detection, P4_16 v1model / BMv2
  *
  * Forwarding logic:
- *   ARP broadcast  → flood via multicast group 1 (host ports only)
+ *   ARP broadcast  → split-horizon flood via per-ingress-port
+ *                    multicast group (excludes ingress port)
  *   ARP unicast    → tbl_l2 lookup (replies go directly to requester)
  *   IP/ICMP/other  → tbl_l2 lookup → forward to correct port
  *   Unknown MAC    → drop (no IP flooding)
@@ -12,12 +13,12 @@
  *   Every 10th ARP  → snapshot registers, reset to 0, clone to CPU port 255
  *   Cloned packet   → egress prepends cpu_header_t (41 bytes)
  *
- * Fixes applied:
- *   1. meta.do_clone = 0 initialized every packet — no spurious clones
- *   2. ARP unicast replies → tbl_l2 not flood — efficient forwarding
- *   3. flood() only for broadcast ARP, never for IP
- *   4. clone_preserving_field_list with @field_list(0) annotations
- *   5. emit() is no-op if invalid — cpu_hdr only on cloned packets
+ * Flood design (split-horizon):
+ *   Multicast group (ingress_port + 1) contains every port EXCEPT
+ *   ingress_port.  This makes loop prevention a data-plane property:
+ *   no packet is ever sent back toward the link it arrived on, so a
+ *   tree topology is guaranteed loop-free without any egress check.
+ *   An egress safety-net drop is kept as defence-in-depth.
  * ============================================================ */
 
 #include <core.p4>
@@ -152,7 +153,6 @@ control MyIngress(inout headers_t    hdr,
 
     action l2_forward(bit<9> port) { std_meta.egress_spec = port; }
     action drop()                  { mark_to_drop(std_meta); }
-    action flood()                 { std_meta.mcast_grp = 1; }
 
     table tbl_l2 {
         key            = { hdr.ethernet.dst_addr : exact; }
@@ -164,8 +164,7 @@ control MyIngress(inout headers_t    hdr,
     apply {
         tbl_switch_id.apply();
 
-        // FIX 1: always initialize do_clone to 0
-        // Prevents garbage value triggering spurious clones on non-10th packets
+        // Always initialize do_clone to 0 — prevents spurious clones
         meta.do_clone = 0;
 
         if (hdr.arp.isValid()) {
@@ -192,8 +191,7 @@ control MyIngress(inout headers_t    hdr,
             if (is_gratuitous == 1) { cur_grat  = cur_grat  + 1; }
             if (is_broadcast  == 1) { cur_bcast = cur_bcast + 1; }
 
-            // Every 10th ARP: snapshot current values into metadata,
-            // reset all registers to zero, schedule clone to CPU
+            // Every 10th ARP: snapshot, reset, schedule clone
             if (cur_ctr == SAMPLE_EVERY) {
                 meta.snap_total      = cur_total;
                 meta.snap_request    = cur_req;
@@ -202,13 +200,10 @@ control MyIngress(inout headers_t    hdr,
                 meta.snap_broadcast  = cur_bcast;
                 meta.snap_counter    = cur_ctr;
                 meta.do_clone        = 1;
-                // Reset all to zero — fresh window starts
                 cur_total = 0; cur_req   = 0; cur_rep   = 0;
                 cur_grat  = 0; cur_bcast = 0; cur_ctr   = 0;
             }
 
-            // Write back: either incremented values (packets 1-9)
-            // or zeros (packet 10, after reset above)
             reg_arp_total.write(0,       cur_total);
             reg_arp_request.write(0,     cur_req);
             reg_arp_reply.write(0,       cur_rep);
@@ -216,24 +211,22 @@ control MyIngress(inout headers_t    hdr,
             reg_broadcast.write(0,       cur_bcast);
             reg_sample_counter.write(0,  cur_ctr);
 
-            // Clone to CPU port — egress will prepend cpu_header
             if (meta.do_clone == 1) {
                 clone_preserving_field_list(CloneType.I2E, CLONE_SESSION, 0);
             }
 
             // ── ARP forwarding ────────────────────────────────────────────
-            // FIX 2: broadcast ARP (requests) → flood to host-facing ports
-            //        unicast ARP  (replies)   → tbl_l2 direct forwarding
-            // This prevents flooding ARP replies to all hosts unnecessarily
+            // Split-horizon flood: group (ingress_port + 1) already
+            // excludes the ingress port, so loops are structurally
+            // impossible regardless of egress behaviour.
             if (hdr.ethernet.dst_addr == BROADCAST_MAC) {
-                flood();
+                std_meta.mcast_grp = (bit<16>)std_meta.ingress_port + 1;
             } else {
                 tbl_l2.apply();
             }
 
         } else {
-            // ── Non-ARP forwarding (IPv4, ICMP, TCP, UDP, etc.) ──────────
-            // No monitoring, no registers, no cloning — pure forwarding
+            // ── Non-ARP forwarding ───────────────────────────────────────
             tbl_l2.apply();
         }
     }
@@ -245,8 +238,15 @@ control MyEgress(inout headers_t    hdr,
                  inout standard_metadata_t std_meta)
 {
     apply {
-        // Only the cloned copy (egress_port == 255) gets the cpu_header prepended
-        // The original ARP packet exits normally without modification
+        // Safety-net: drop any multicast copy that somehow targets the
+        // ingress port (should never happen with split-horizon groups,
+        // but defence-in-depth costs nothing).
+        if (std_meta.egress_port == std_meta.ingress_port) {
+            mark_to_drop(std_meta);
+            return;
+        }
+
+        // Only the cloned copy (port 255) gets the cpu_header
         if (std_meta.egress_port == CPU_PORT) {
             hdr.cpu_hdr.setValid();
             hdr.cpu_hdr.reason             = 0xAA;
@@ -274,9 +274,6 @@ control MyComputeChecksum(inout headers_t hdr, inout metadata_t meta) {
 // ── Deparser ──────────────────────────────────────────────────────────────────
 control MyDeparser(packet_out pkt, in headers_t hdr) {
     apply {
-        // emit() is a no-op when header is invalid (BMv2 v1model behavior)
-        // cpu_hdr is only valid on the cloned packet (setValid called in egress)
-        // original packet: cpu_hdr invalid → skipped automatically
         pkt.emit(hdr.cpu_hdr);
         pkt.emit(hdr.ethernet);
         pkt.emit(hdr.ipv4);
