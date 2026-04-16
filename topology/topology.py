@@ -40,28 +40,22 @@ def compute_mac_tables():
     - s1, s2: host ports 0..7, uplink to core on port 8
     - s11:    s1 on port 0, s2 on port 1
     """
-    # Build host list per edge switch
     sw_hosts = {1: [], 2: []}
     for sw_num in EDGE_SWITCHES:
         for j in range(1, HOSTS_PER_EDGE + 1):
             mac = f"00:00:00:00:{sw_num:02x}:{j:02x}"
-            sw_hosts[sw_num].append((mac, j-1))   # port 0-indexed
+            sw_hosts[sw_num].append((mac, j-1))
 
     tables = {1: {}, 2: {}, 11: {}}
 
-    # ----- Edge switches s1 and s2 -----
     for sw_num in EDGE_SWITCHES:
-        uplink_port = HOSTS_PER_EDGE   # port 8 (0-indexed)
-        # Local hosts
+        uplink_port = HOSTS_PER_EDGE   # port 8
         for mac, port in sw_hosts[sw_num]:
             tables[sw_num][mac] = port
-        # Remote hosts (the other edge) via uplink
         other_sw = 2 if sw_num == 1 else 1
         for mac, _ in sw_hosts[other_sw]:
             tables[sw_num][mac] = uplink_port
 
-    # ----- Core switch s11 -----
-    # Port 0 -> s1, Port 1 -> s2
     for mac, _ in sw_hosts[1]:
         tables[11][mac] = 0
     for mac, _ in sw_hosts[2]:
@@ -97,7 +91,6 @@ class P4Switch(Switch):
                 continue
             iface_args += ["-i", f"{port_idx}@{intf.name}"]
             port_idx += 1
-        # CPU port always 255
         iface_args += ["-i", f"255@{self.cpu_intf}"]
 
         cmd = [
@@ -122,15 +115,18 @@ class P4Switch(Switch):
 
     def configure(self, mac_table, switch_type):
         """
-        Configure split‑horizon multicast groups.
+        Configure split-horizon multicast groups.
         Creates one group per data port, group_id = ingress_port + 1,
         containing all data ports EXCEPT the ingress_port.
         """
-        # Collect all data ports (interfaces except 'lo')
+        # Manual counter to match start() exactly — do NOT use enumerate()
         data_ports = []
-        for idx, intf in enumerate(self.intfList()):
+        port_idx = 0
+        for intf in self.intfList():
             if intf.name != "lo":
-                data_ports.append(idx)
+                data_ports.append(port_idx)
+                port_idx += 1
+
         num_ports = len(data_ports)
 
         lines = []
@@ -138,22 +134,18 @@ class P4Switch(Switch):
         lines.append("mirroring_add 100 255")
 
         handle = 0
-        # Create one multicast group per possible ingress port
-        for ingress in range(num_ports):
+        for ingress in data_ports:
             group_id = ingress + 1
             lines.append(f"mc_mgrp_create {group_id}")
 
-            # Egress ports = all data ports except the ingress port
             egress_ports = [p for p in data_ports if p != ingress]
             first_handle = handle
             for egress in egress_ports:
                 lines.append(f"mc_node_create {handle} {egress}")
                 handle += 1
-            # Associate all nodes of this group
             for h in range(first_handle, handle):
                 lines.append(f"mc_node_associate {group_id} {h}")
 
-        # L2 forwarding entries
         for mac, port in sorted(mac_table.items()):
             lines.append(f"table_add tbl_l2 l2_forward {mac} => {port}")
 
@@ -196,7 +188,7 @@ def main():
     for sw_num in EDGE_SWITCHES:
         for j in range(1, HOSTS_PER_EDGE + 1):
             mac = f"00:00:00:00:{sw_num:02x}:{j:02x}"
-            ip  = f"10.{sw_num}.{j}.1/8"          # <-- changed from /16 to /8
+            ip  = f"10.{sw_num}.{j}.1/8"
             h = net.addHost(f"h{host_idx}", ip=ip, mac=mac)
             net.addLink(h, switches[f"s{sw_num}"])
             host_idx += 1
@@ -220,7 +212,6 @@ def main():
             switch_type = "edge"
         sw.configure(mac_tables[sw_num], switch_type)
 
-    # Generate controller command (optional)
     ifaces = " ".join(switches[f"s{i}"].cpu_ctrl for i in ALL_SWITCH_NUMS)
 
     info("\n" + "="*60)

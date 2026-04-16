@@ -9,7 +9,6 @@ mc_node_create 4 5
 mc_node_create 5 6
 mc_node_create 6 7
 mc_node_create 7 8
-mc_node_create 8 9
 mc_node_associate 1 0
 mc_node_associate 1 1
 mc_node_associate 1 2
@@ -18,8 +17,8 @@ mc_node_associate 1 4
 mc_node_associate 1 5
 mc_node_associate 1 6
 mc_node_associate 1 7
-mc_node_associate 1 8
 mc_mgrp_create 2
+mc_node_create 8 0
 mc_node_create 9 2
 mc_node_create 10 3
 mc_node_create 11 4
@@ -27,7 +26,7 @@ mc_node_create 12 5
 mc_node_create 13 6
 mc_node_create 14 7
 mc_node_create 15 8
-mc_node_create 16 9
+mc_node_associate 2 8
 mc_node_associate 2 9
 mc_node_associate 2 10
 mc_node_associate 2 11
@@ -35,8 +34,8 @@ mc_node_associate 2 12
 mc_node_associate 2 13
 mc_node_associate 2 14
 mc_node_associate 2 15
-mc_node_associate 2 16
 mc_mgrp_create 3
+mc_node_create 16 0
 mc_node_create 17 1
 mc_node_create 18 3
 mc_node_create 19 4
@@ -44,7 +43,7 @@ mc_node_create 20 5
 mc_node_create 21 6
 mc_node_create 22 7
 mc_node_create 23 8
-mc_node_create 24 9
+mc_node_associate 3 16
 mc_node_associate 3 17
 mc_node_associate 3 18
 mc_node_associate 3 19
@@ -52,8 +51,8 @@ mc_node_associate 3 20
 mc_node_associate 3 21
 mc_node_associate 3 22
 mc_node_associate 3 23
-mc_node_associate 3 24
 mc_mgrp_create 4
+mc_node_create 24 0
 mc_node_create 25 1
 mc_node_create 26 2
 mc_node_create 27 4
@@ -61,7 +60,7 @@ mc_node_create 28 5
 mc_node_create 29 6
 mc_node_create 30 7
 mc_node_create 31 8
-mc_node_create 32 9
+mc_node_associate 4 24
 mc_node_associate 4 25
 mc_node_associate 4 26
 mc_node_associate 4 27
@@ -69,8 +68,8 @@ mc_node_associate 4 28
 mc_node_associate 4 29
 mc_node_associate 4 30
 mc_node_associate 4 31
-mc_node_associate 4 32
 mc_mgrp_create 5
+mc_node_create 32 0
 mc_node_create 33 1
 mc_node_create 34 2
 mc_node_create 35 3
@@ -78,7 +77,7 @@ mc_node_create 36 5
 mc_node_create 37 6
 mc_node_create 38 7
 mc_node_create 39 8
-mc_node_create 40 9
+mc_node_associate 5 32
 mc_node_associate 5 33
 mc_node_associate 5 34
 mc_node_associate 5 35
@@ -86,8 +85,8 @@ mc_node_associate 5 36
 mc_node_associate 5 37
 mc_node_associate 5 38
 mc_node_associate 5 39
-mc_node_associate 5 40
 mc_mgrp_create 6
+mc_node_create 40 0
 mc_node_create 41 1
 mc_node_create 42 2
 mc_node_create 43 3
@@ -95,7 +94,7 @@ mc_node_create 44 4
 mc_node_create 45 6
 mc_node_create 46 7
 mc_node_create 47 8
-mc_node_create 48 9
+mc_node_associate 6 40
 mc_node_associate 6 41
 mc_node_associate 6 42
 mc_node_associate 6 43
@@ -103,8 +102,8 @@ mc_node_associate 6 44
 mc_node_associate 6 45
 mc_node_associate 6 46
 mc_node_associate 6 47
-mc_node_associate 6 48
 mc_mgrp_create 7
+mc_node_create 48 0
 mc_node_create 49 1
 mc_node_create 50 2
 mc_node_create 51 3
@@ -112,7 +111,7 @@ mc_node_create 52 4
 mc_node_create 53 5
 mc_node_create 54 7
 mc_node_create 55 8
-mc_node_create 56 9
+mc_node_associate 7 48
 mc_node_associate 7 49
 mc_node_associate 7 50
 mc_node_associate 7 51
@@ -120,8 +119,8 @@ mc_node_associate 7 52
 mc_node_associate 7 53
 mc_node_associate 7 54
 mc_node_associate 7 55
-mc_node_associate 7 56
 mc_mgrp_create 8
+mc_node_create 56 0
 mc_node_create 57 1
 mc_node_create 58 2
 mc_node_create 59 3
@@ -129,7 +128,7 @@ mc_node_create 60 4
 mc_node_create 61 5
 mc_node_create 62 6
 mc_node_create 63 8
-mc_node_create 64 9
+mc_node_associate 8 56
 mc_node_associate 8 57
 mc_node_associate 8 58
 mc_node_associate 8 59
@@ -137,8 +136,8 @@ mc_node_associate 8 60
 mc_node_associate 8 61
 mc_node_associate 8 62
 mc_node_associate 8 63
-mc_node_associate 8 64
 mc_mgrp_create 9
+mc_node_create 64 0
 mc_node_create 65 1
 mc_node_create 66 2
 mc_node_create 67 3
@@ -146,7 +145,7 @@ mc_node_create 68 4
 mc_node_create 69 5
 mc_node_create 70 6
 mc_node_create 71 7
-mc_node_create 72 9
+mc_node_associate 9 64
 mc_node_associate 9 65
 mc_node_associate 9 66
 mc_node_associate 9 67
@@ -154,7 +153,6 @@ mc_node_associate 9 68
 mc_node_associate 9 69
 mc_node_associate 9 70
 mc_node_associate 9 71
-mc_node_associate 9 72
 table_add tbl_l2 l2_forward 00:00:00:00:01:01 => 0
 table_add tbl_l2 l2_forward 00:00:00:00:01:02 => 1
 table_add tbl_l2 l2_forward 00:00:00:00:01:03 => 2
